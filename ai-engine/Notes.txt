@@ -1,0 +1,4 @@
+http://127.0.0.1:8000/health
+http://127.0.0.1:8000/api/v1/market-data
+
+.\.venv\Scripts\python.exe -m uvicorn src.api.main:app --reload --host 127.0.0.1 --port 8000

@@ -1,0 +1,29 @@
+services:
+  ai-engine:
+    build: ./ai-engine
+    ports:
+      - "8000:8000"
+
+  java-platform:
+    build: ./java-platform
+    ports:
+      - "8080:8080"
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: quantagent
+      POSTGRES_USER: quantagent
+      POSTGRES_PASSWORD: quantagent
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:

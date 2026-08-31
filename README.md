@@ -1,0 +1,157 @@
+# AI Quant Research Agent
+
+## Current milestone: Phase 5 — Deterministic Backtesting Engine
+
+Phase 5 turns the validated Strategy DSL into an auditable historical simulation. LLMs still do not calculate returns, positions, P&L, costs, or benchmark performance. Those are deterministic Python operations.
+
+### End-to-end workflow
+
+```text
+START
+  ↓
+Market Data Agent
+  ↓
+Research Agent + RAG
+  ↓
+Strategy Generation Agent
+  ↓
+Validated Strategy DSL
+  ↓
+Backtest Agent
+  ├── signal generation
+  ├── one-bar position shift
+  ├── transaction costs
+  ├── slippage
+  ├── equity curve
+  ├── trade ledger
+  └── buy-and-hold benchmark
+  ↓
+BACKTEST_READY
+  ↓
+END
+```
+
+## Backtesting mathematics
+
+A strategy signal formed using information available at bar `t` is not allowed to earn bar `t`'s return. The executable position is shifted by one bar:
+
+```text
+position[t] = target_position[t-1]
+```
+
+Gross strategy return:
+
+```text
+R_gross,t = w_(t-1) * R_t
+```
+
+Turnover:
+
+```text
+turnover_t = |w_t - w_(t-1)|
+```
+
+Costs:
+
+```text
+transaction_cost_t = turnover_t * transaction_cost_bps / 10000
+slippage_cost_t    = turnover_t * slippage_bps / 10000
+```
+
+Net strategy return:
+
+```text
+R_strategy,t = R_gross,t - transaction_cost_t - slippage_cost_t
+```
+
+Equity curve:
+
+```text
+Equity_t = Equity_(t-1) * (1 + R_strategy,t)
+```
+
+For multiple strategy assets, Phase 5 uses an equal-weight portfolio of per-symbol strategy returns. The benchmark is equal-weight buy-and-hold across the same assets.
+
+## New Phase 5 code
+
+```text
+ai-engine/src/backtesting/
+├── __init__.py
+└── engine.py
+
+ai-engine/src/agents/
+└── backtest_agent.py
+
+ai-engine/src/models/
+└── backtest.py
+```
+
+### Outputs
+
+The backtest result contains:
+
+- initial/final equity
+- total strategy return
+- buy-and-hold benchmark return
+- excess return
+- daily equity curve
+- trade ledger with signal and execution dates
+- transaction/slippage costs
+- per-symbol results
+- diagnostics documenting the one-bar execution lag
+
+## Example API request
+
+```bash
+curl -X POST http://localhost:8000/api/v1/research/run \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "Research a momentum strategy for AAPL and MSFT with a volatility filter",
+    "symbols": ["AAPL", "MSFT"],
+    "start_date": "2024-01-01",
+    "end_date": "2025-01-01",
+    "volatility_window": 20,
+    "momentum_window": 20,
+    "top_k": 5,
+    "slippage_bps": 2.0,
+    "initial_capital": 100000
+  }'
+```
+
+Expected terminal status:
+
+```json
+{
+  "status": "BACKTEST_READY",
+  "current_agent": "backtest",
+  "backtest": {
+    "strategy_name": "VolatilityFilteredMomentum",
+    "initial_capital": 100000.0,
+    "final_equity": 0,
+    "benchmark_final_equity": 0,
+    "total_return": 0,
+    "benchmark_return": 0,
+    "excess_return": 0,
+    "equity_curve": [],
+    "trades": []
+  }
+}
+```
+
+Values above are placeholders; the API returns values computed from actual historical observations.
+
+## Testing
+
+The dependency-independent suite currently has 14 passing tests, including explicit checks that:
+
+- the entry signal is shifted one bar before earning returns;
+- transaction costs and slippage reduce performance when turnover occurs;
+- BUY/SELL events appear in the trade ledger;
+- a benchmark equity curve is produced;
+- unsupported/future features are rejected before the backtester.
+
+The container used to build this phase does not have `langgraph` installed, so the LangGraph integration/API tests cannot be executed here. Install `ai-engine/requirements.txt` locally to run the full suite.
+
+## Next milestone
+
+Phase 6 adds a deterministic Risk Agent: CAGR, annualized volatility, Sharpe, Sortino, maximum drawdown, VaR, Expected Shortfall, turnover, exposure, and additional risk diagnostics.
