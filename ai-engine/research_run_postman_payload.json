@@ -1,0 +1,13 @@
+{
+  "query": "Find a momentum strategy for AAPL",
+  "symbols": [
+    "AAPL"
+  ],
+  "start_date": "2025-01-01",
+  "end_date": "2025-03-01",
+  "volatility_window": 20,
+  "momentum_window": 20,
+  "top_k": 3,
+  "slippage_bps": 2.0,
+  "initial_capital": 100000.0
+}

@@ -34,7 +34,7 @@ def build_test_research_agent():
     return ResearchAgent(ResearchRetriever(store), DeterministicResearchSynthesizer())
 
 
-def test_phase_5_graph_runs_market_data_research_then_strategy():
+def test_phase_6_graph_runs_market_data_research_then_strategy():
     market_agent = MarketDataAgent(MarketDataTool(MarketDataService(provider=FakeProvider())))
     graph = build_research_graph(market_agent, build_test_research_agent(), StrategyAgent(DeterministicStrategySynthesizer()), with_memory=False)
     state = graph.invoke({
@@ -51,8 +51,8 @@ def test_phase_5_graph_runs_market_data_research_then_strategy():
         "errors": [],
     })
     assert state["research_id"] == "R-TEST"
-    assert state["status"] == "BACKTEST_READY"
-    assert state["current_agent"] == "backtest"
+    assert state["status"] == "REPORT_READY"
+    assert state["current_agent"] == "report"
     assert state["market_data"]["symbols"]["AAPL"]["latest"]["close"] == 159.0
     assert state["research"]["assets"] == ["AAPL"]
     assert state["strategy"]["name"] == "VolatilityFilteredMomentum"

@@ -1,0 +1,339 @@
+I’ll trace the actual strategy synthesizer and rule engine used for this request, then explain the applied rules and the key backtest equations in plain language.
+
+Read 
+
+Read 
+
+Read 
+
+Read 
+
+For this input, the project applies a **long-only volatility-filtered momentum strategy**.
+
+## Strategy applied
+
+The strategy is named:
+
+```text
+VolatilityFilteredMomentum
+```
+
+It tries to buy AAPL only when all three conditions are true.
+
+### Entry condition
+
+```text
+momentum > 0.05
+AND
+close > sma_50
+AND
+volatility < 0.35
+```
+
+In plain English:
+
+1. AAPL gained more than 5% during the momentum window.
+2. The current price is above its 50-day moving average.
+3. Annualized volatility is below 35%.
+
+This attempts to find an upward trend while avoiding highly unstable periods.
+
+---
+
+## Mathematical explanation
+
+### 1. Momentum
+
+The code calculates:
+
+$$
+M_t(N) = \frac{P_t}{P_{t-N}} - 1
+$$
+
+With your input:
+
+```text
+momentum_window = 20
+```
+
+So:
+
+$$
+M_t(20) = \frac{P_t}{P_{t-20}} - 1
+$$
+
+The entry rule is:
+
+$$
+M_t(20) > 0.05
+$$
+
+That means the current price must be more than 5% above its price 20 periods ago.
+
+Example:
+
+```text
+Price 20 days ago = $100
+Current price = $106
+```
+
+$$
+M_t(20) = \frac{106}{100} - 1 = 0.06 = 6\%
+$$
+
+Since $6\% > 5\%$, the momentum condition passes.
+
+---
+
+### 2. SMA 50 trend confirmation
+
+The 50-day simple moving average is:
+
+$$
+SMA_{50,t} =
+\frac{P_t + P_{t-1} + \cdots + P_{t-49}}{50}
+$$
+
+The rule is:
+
+$$
+P_t > SMA_{50,t}
+$$
+
+This means the current price must be above its average price over the previous 50 periods.
+
+Intuition:
+
+```text
+Current price above SMA 50 → upward trend confirmation
+Current price below SMA 50 → trend is not confirmed
+```
+
+---
+
+### 3. Volatility filter
+
+Log return is calculated first:
+
+$$
+r_t = \ln\left(\frac{P_t}{P_{t-1}}\right)
+$$
+
+Then rolling annualized volatility:
+
+$$
+\sigma_t =
+std(r_{t-19}, \ldots, r_t) \times \sqrt{252}
+$$
+
+With:
+
+```text
+volatility_window = 20
+```
+
+The entry rule is:
+
+$$
+\sigma_t < 0.35
+$$
+
+Since `0.35` equals 35%, the strategy avoids entering when estimated annualized volatility is 35% or higher.
+
+---
+
+## Exit condition
+
+The exit group uses `any`, so only one condition needs to become true:
+
+```text
+momentum < 0
+OR
+close < sma_50
+```
+
+Mathematically:
+
+$$
+M_t(20) < 0
+\quad \text{OR} \quad
+P_t < SMA_{50,t}
+$$
+
+The strategy exits when either:
+
+- 20-day momentum becomes negative, or
+- price falls below the 50-day moving average.
+
+This protects the position when the upward trend weakens.
+
+---
+
+## Position sizing
+
+The strategy uses:
+
+```json
+{
+  "method": "fixed_fraction",
+  "fraction": 1.0
+}
+```
+
+That means it invests 100% of the allocated portfolio in AAPL while the position is active.
+
+With:
+
+```text
+initial_capital = $100,000
+```
+
+the maximum position allocation is approximately:
+
+```text
+$100,000 × 1.0 = $100,000
+```
+
+This is a fully invested long-only position, not a short position.
+
+---
+
+## Trading costs
+
+The strategy has:
+
+```text
+transaction_cost_bps = 5.0
+slippage_bps = 2.0
+```
+
+Total assumed cost per position change is approximately:
+
+$$
+5 + 2 = 7 \text{ basis points}
+$$
+
+Since:
+
+$$
+1 \text{ basis point} = 0.01\%
+$$
+
+then:
+
+$$
+7 \text{ bps} = 0.07\% = 0.0007
+$$
+
+The backtest calculates:
+
+$$
+\text{transaction cost}
+=
+\text{turnover}
+\times
+\frac{5}{10,000}
+$$
+
+and:
+
+$$
+\text{slippage cost}
+=
+\text{turnover}
+\times
+\frac{2}{10,000}
+$$
+
+---
+
+## Important one-day delay
+
+The strategy does not trade on the same day that a signal is detected.
+
+The engine does:
+
+```python
+frame["position"] = frame["target_position"].shift(1)
+```
+
+This means:
+
+```text
+Signal detected on day t
+Trade executed on day t + 1
+```
+
+This prevents look-ahead bias. The backtest does not pretend that the strategy knew today’s closing information before trading today.
+
+---
+
+## Final return calculation
+
+For each period, the strategy return is approximately:
+
+$$
+R^{strategy}_t =
+position_{t-1}
+\times
+simpleReturn_t
+-
+transactionCost_t
+-
+slippageCost_t
+$$
+
+The portfolio equity is then compounded:
+
+$$
+Equity_t =
+InitialCapital
+\times
+\prod_{i=1}^{t}(1 + R^{strategy}_i)
+$$
+
+Finally:
+
+$$
+TotalReturn =
+\frac{FinalEquity}{InitialCapital} - 1
+$$
+
+For example, if:
+
+```text
+initial capital = $100,000
+final equity = $108,000
+```
+
+then:
+
+$$
+TotalReturn =
+\frac{108000}{100000} - 1
+= 0.08
+= 8\%
+$$
+
+## Summary
+
+Your request produces this logic:
+
+```text
+Buy AAPL when:
+    20-day momentum > 5%
+    AND price > 50-day SMA
+    AND annualized volatility < 35%
+
+Exit when:
+    20-day momentum < 0%
+    OR price < 50-day SMA
+
+Position:
+    Long only
+    100% allocation
+    One-bar execution delay
+    Transaction cost + slippage included
+```
+
+One implementation detail: if `OPENAI_API_KEY` is set, the strategy may be generated by `OpenAIStrategySynthesizer`. Without that key, the deterministic strategy above is used.

@@ -31,7 +31,7 @@ class FakeProvider:
         )
 
 
-def test_research_run_api_executes_phase_5_graph(monkeypatch):
+def test_research_run_api_executes_phase_6_graph(monkeypatch):
     market_agent = MarketDataAgent(MarketDataTool(MarketDataService(provider=FakeProvider())))
     store = InMemoryVectorStore(HashEmbeddingProvider(dimensions=128))
     store.add(chunk_document(Document("m", "Momentum", "momentum trend volatility filter"), chunk_size=100, overlap=10))
@@ -51,8 +51,10 @@ def test_research_run_api_executes_phase_5_graph(monkeypatch):
     })
     assert response.status_code == 200
     body = response.json()
-    assert body["status"] == "BACKTEST_READY"
-    assert body["current_agent"] == "backtest"
+    assert body["status"] == "REPORT_READY"
+    assert body["current_agent"] == "report"
+    assert body["evaluation"]["decision"] in {"ACCEPT", "REJECT"}
+    assert body["report"]["decision"] == body["evaluation"]["decision"]
     assert body["market_data"]["symbols"]["AAPL"]["observation_count"] == 60
     assert body["research"]["assets"] == ["AAPL"]
     assert body["strategy"]["name"] == "VolatilityFilteredMomentum"

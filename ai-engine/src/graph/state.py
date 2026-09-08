@@ -12,6 +12,8 @@ class ResearchState(TypedDict, total=False):
     top_k: int
     slippage_bps: float
     initial_capital: float
+    annual_risk_free_rate: float
+    var_confidence: float
 
     market_data: dict[str, Any]
     research: dict[str, Any] | None
@@ -19,6 +21,7 @@ class ResearchState(TypedDict, total=False):
     backtest: dict[str, Any] | None
     risk: dict[str, Any] | None
     evaluation: dict[str, Any] | None
+    report: dict[str, Any] | None
 
     iteration: int
     status: str

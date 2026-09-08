@@ -3,16 +3,14 @@
 Searched for regex `market-data|research/run|client.post\(|requests.post\(` (`**/tests/**`), 1 result
 
 Read 
+  "decision": "ACCEPT",
+  "score": 1.0,
 
-## 🔎 Project analysis
-
-This project is a FastAPI-based quantitative research pipeline built around a LangGraph workflow. The main entrypoint is `main.py`, and the orchestration is defined in `workflow.py`.
+This project is a FastAPI-based quantitative research pipeline built around a LangGraph workflow. The main entrypoint is `src/api/main.py`, and the orchestration is defined in `src/graph/workflow.py`. The current workflow is Phase 7 and ends with deterministic evaluation after risk analytics.
 
 The real pipeline flow is:
-
-- API receives request
-- Market data is downloaded and feature-enriched
-- Research agent retrieves evidence from local knowledge docs
+    "weaknesses": [],
+    "failed_checks": []
 - Strategy agent translates research into a strategy DSL
 - Backtest engine evaluates the strategy deterministically
 - Response is returned as structured JSON
@@ -50,8 +48,14 @@ flowchart TD
     D --> P[BacktestAgent]
     P --> Q[BacktestEngine]
     Q --> R[Portfolio + trade result]
+    R --> T[RiskAgent]
+    T --> U[RiskEngine]
+    U --> V[Risk metrics vs benchmark]
+    V --> W[EvaluationAgent]
+    W --> X[EvaluationEngine]
+    X --> Y[ACCEPT or REJECT decision]
 
-    R --> S[ResearchRunResponse]
+    Y --> S[ResearchRunResponse]
     S --> A
 ```
 
@@ -68,6 +72,7 @@ sequenceDiagram
     participant R as ResearchAgent
     participant S as StrategyAgent
     participant B as BacktestAgent
+    participant K as RiskAgent
 
     Client->>API: POST /api/v1/market-data
     API->>MD: market_data request
@@ -84,8 +89,12 @@ sequenceDiagram
     S-->>Graph: strategy spec
     Graph->>B: backtest strategy
     B-->>Graph: backtest result
+    Graph->>K: calculate risk metrics
+    K-->>Graph: strategy and benchmark risk results
+    Graph->>E: evaluate acceptance criteria
+    E-->>Graph: decision, score, strengths, weaknesses
     Graph-->>API: ResearchRunResponse
-    API-->>Client: status, strategy, backtest, errors
+    API-->>Client: status, strategy, backtest, risk, evaluation, errors
 ```
 
 ---
@@ -192,11 +201,133 @@ These are exactly the inputs that the research and strategy agents can later tur
   - trade records
   - per-symbol metrics
 
-### 5) API layer
+### 5) Risk layer
+- `risk_agent.py` runs after a successful backtest.
+- `risk/engine.py` calculates deterministic risk analytics from realized equity-curve returns.
+- `models/risk.py` validates the risk result returned by the API.
+- The engine calculates the same metrics for both the strategy and a fully invested buy-and-hold benchmark.
+
+#### Risk metrics
+
+For $n$ observations and `periods_per_year = 252`, the engine calculates:
+
+- **CAGR**: annualized growth from initial to final equity.
+
+  $$
+  CAGR = \left(\frac{E_T}{E_0}\right)^{1/Y} - 1,
+  \qquad Y = \frac{n}{252}
+  $$
+
+- **Annualized volatility**: sample standard deviation of periodic returns annualized by the square root of the number of periods.
+
+  $$
+  \sigma_{annual} = std(R_t) \times \sqrt{252}
+  $$
+
+- **Sharpe ratio**: annualized excess return divided by annualized volatility. The risk-free rate is converted from annual to periodic form first.
+
+  $$
+  r_f^{period} = (1 + r_f^{annual})^{1/252} - 1
+  $$
+
+  $$
+  Sharpe = \frac{mean(R_t - r_f^{period}) \times 252}{\sigma_{annual}}
+  $$
+
+- **Sortino ratio**: similar to Sharpe, but only negative excess returns contribute to downside deviation.
+
+  $$
+  Sortino = \frac{mean(R_t - r_f^{period}) \times 252}{\sqrt{mean(min(R_t-r_f^{period}, 0)^2)} \times \sqrt{252}}
+  $$
+
+- **Maximum drawdown**: the largest fall from a previous equity peak. It is returned as a negative decimal, so `-0.20` means a 20% drawdown.
+
+  $$
+  Drawdown_t = \frac{E_t}{max(E_0, E_1, \ldots, E_t)} - 1
+  $$
+
+  $$
+  MaxDrawdown = min(Drawdown_t)
+  $$
+
+- **Historical VaR**: the loss threshold at the lower tail of the realized return distribution. At 95% confidence, it uses the 5th percentile.
+
+  $$
+  VaR_{95\%} = max(0, -Quantile(R_t, 0.05))
+  $$
+
+- **Expected shortfall**: the average loss of returns at or below the VaR quantile.
+
+  $$
+  ES_{95\%} = max(0, -mean(R_t \mid R_t \le Quantile(R_t, 0.05)))
+  $$
+
+- **Turnover and exposure**: total and average position changes, average/max absolute portfolio exposure, and the percentage of periods with a non-zero position.
+
+The risk engine uses historical realized returns; it does not forecast future risk or fit a statistical model.
+
+### 6) Evaluation layer
+- `evaluation_agent.py` runs after the risk stage.
+- `evaluation/engine.py` applies deterministic acceptance checks to the completed backtest and risk result.
+- `models/evaluation.py` validates the structured decision returned by the workflow.
+
+The default acceptance thresholds are:
+
+| Check | Acceptance rule |
+| --- | --- |
+| Sharpe outperformance | Strategy Sharpe must be greater than benchmark Sharpe |
+| Drawdown | Maximum drawdown must be no worse than 20% |
+| CAGR | CAGR must be greater than 5% |
+| Expected shortfall | Expected shortfall must be at most 5% |
+| Enough trades | At least 3 trades must be present |
+| Reasonable turnover | Average daily turnover must be at most 25% |
+| Risk-adjusted outperformance | Strategy total return must beat the benchmark and strategy Sharpe must be positive |
+
+The evaluation score is:
+
+$$
+score = \frac{\text{number of passed checks}}{\text{total number of checks}}
+$$
+
+The decision is `ACCEPT` only when every check passes. Otherwise it is `REJECT`, and `failed_checks` identifies the failed criteria.
+
+Example evaluation result:
+
+```json
+{
+  "decision": "ACCEPT",
+  "score": 1.0,
+  "strengths": ["CAGR is above the 5% minimum"],
+  "weaknesses": [],
+  "failed_checks": []
+}
+```
+
+#### Risk request parameters
+
+The research endpoint accepts two Phase 6 risk controls:
+
+```json
+{
+  "annual_risk_free_rate": 0.0,
+  "var_confidence": 0.95
+}
+```
+
+`annual_risk_free_rate` is an annual decimal rate, so `0.05` means 5% per year. `var_confidence` must be greater than `0.5` and less than `1.0`; `0.95` means the lower 5% return tail is used for historical VaR and expected shortfall.
+
+### 7) API layer
 - `main.py` exposes:
   - GET /health
   - POST /api/v1/market-data
+  - POST /api/v1/market-data/plot
   - POST /api/v1/research/run
+
+`POST /api/v1/market-data` returns structured JSON. To visualize the same market-data result, send the same request to `POST /api/v1/market-data/plot`; it returns a PNG image with three panels:
+
+- closing price with SMA 20 and SMA 50
+- momentum
+- annualized rolling volatility
 
 ---
 
@@ -268,7 +399,9 @@ Request JSON:
   "momentum_window": 20,
   "top_k": 3,
   "slippage_bps": 2.0,
-  "initial_capital": 100000.0
+  "initial_capital": 100000.0,
+  "annual_risk_free_rate": 0.0,
+  "var_confidence": 0.95
 }
 ```
 
@@ -277,8 +410,8 @@ Expected response shape:
 ```json
 {
   "research_id": "uuid-string",
-  "status": "BACKTEST_READY",
-  "current_agent": "backtest",
+  "status": "EVALUATION_READY",
+  "current_agent": "evaluation",
   "iteration": 4,
   "market_data": {
     "symbols": {
@@ -352,6 +485,64 @@ Expected response shape:
     "per_symbol": [],
     "diagnostics": {}
   },
+  "risk": {
+    "strategy_name": "VolatilityFilteredMomentum",
+    "metrics": {
+      "cagr": 0.12,
+      "annualized_volatility": 0.18,
+      "sharpe_ratio": 0.65,
+      "sortino_ratio": 0.92,
+      "max_drawdown": -0.15,
+      "var_confidence": 0.95,
+      "historical_var": 0.02,
+      "expected_shortfall": 0.03,
+      "total_turnover": 2.0,
+      "average_daily_turnover": 0.01,
+      "average_gross_exposure": 0.40,
+      "max_gross_exposure": 1.0,
+      "percent_days_in_market": 0.40,
+      "observations": 60,
+      "periods_per_year": 252,
+      "annual_risk_free_rate": 0.0
+    },
+    "benchmark": {
+      "cagr": 0.08,
+      "annualized_volatility": 0.22,
+      "sharpe_ratio": 0.45,
+      "sortino_ratio": 0.60,
+      "max_drawdown": -0.20,
+      "var_confidence": 0.95,
+      "historical_var": 0.025,
+      "expected_shortfall": 0.035,
+      "total_turnover": 0.0,
+      "average_daily_turnover": 0.0,
+      "average_gross_exposure": 1.0,
+      "max_gross_exposure": 1.0,
+      "percent_days_in_market": 1.0,
+      "observations": 60,
+      "periods_per_year": 252,
+      "annual_risk_free_rate": 0.0
+    },
+    "diagnostics": {
+      "var_method": "historical",
+      "expected_shortfall_method": "historical tail mean",
+      "annualization_periods": 252,
+      "drawdown_convention": "negative decimal; -0.20 means a 20% drawdown",
+      "exposure_convention": "mean absolute portfolio position; 1.0 means 100% gross exposure"
+    }
+  },
+  "evaluation": {
+    "decision": "ACCEPT",
+    "score": 0.86,
+    "strengths": [
+      "Strategy Sharpe ratio beats the benchmark.",
+      "Maximum drawdown is within 20%."
+    ],
+    "weaknesses": [
+      "Backtest contains fewer than 3 trades."
+    ],
+    "failed_checks": ["enough_trades"]
+  },
   "errors": []
 }
 ```
@@ -374,7 +565,9 @@ Use this first:
   "momentum_window": 20,
   "top_k": 3,
   "slippage_bps": 2.0,
-  "initial_capital": 100000.0
+  "initial_capital": 100000.0,
+  "annual_risk_free_rate": 0.0,
+  "var_confidence": 0.95
 }
 ```
 
@@ -383,6 +576,27 @@ This is the simplest request that exercises the full pipeline:
 - research retrieval
 - strategy synthesis
 - deterministic backtest
+- deterministic risk analytics
+- deterministic evaluation and acceptance decision
+
+### C. Market data plot endpoint
+
+Endpoint:
+- POST /api/v1/market-data/plot
+
+Use the same JSON body as the market-data endpoint:
+
+```json
+{
+  "symbols": ["AAPL", "MSFT"],
+  "start_date": "2025-01-01",
+  "end_date": "2025-03-01",
+  "volatility_window": 20,
+  "momentum_window": 20
+}
+```
+
+In Postman, choose `Send and Download` to save the returned `image/png` response as a chart file.
 
 ---
 

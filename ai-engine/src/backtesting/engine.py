@@ -73,6 +73,8 @@ class BacktestEngine:
                 benchmark_equity=float(row["benchmark_equity"] * initial_capital),
                 strategy_return=float(row["strategy_return"]),
                 benchmark_return=float(row["benchmark_return"]),
+                turnover=float(row.get("turnover", 0.0)),
+                gross_exposure=float(row.get("gross_exposure", 0.0)),
             )
             for index, row in portfolio.iterrows()
         ]
@@ -163,7 +165,14 @@ class BacktestEngine:
             benchmarks.append(item.frame["benchmark_return"].rename(item.symbol))
         strategy_returns = pd.concat(returns, axis=1).fillna(0.0).mean(axis=1)
         benchmark_returns = pd.concat(benchmarks, axis=1).fillna(0.0).mean(axis=1)
-        frame = pd.DataFrame({"strategy_return": strategy_returns, "benchmark_return": benchmark_returns}).sort_index()
+        turnover = pd.concat([item.frame["turnover"].rename(item.symbol) for item in series], axis=1).fillna(0.0).mean(axis=1)
+        gross_exposure = pd.concat([item.frame["position"].abs().rename(item.symbol) for item in series], axis=1).fillna(0.0).mean(axis=1)
+        frame = pd.DataFrame({
+            "strategy_return": strategy_returns,
+            "benchmark_return": benchmark_returns,
+            "turnover": turnover,
+            "gross_exposure": gross_exposure,
+        }).sort_index()
         frame["strategy_equity"] = (1.0 + frame["strategy_return"]).cumprod()
         frame["benchmark_equity"] = (1.0 + frame["benchmark_return"]).cumprod()
         return frame

@@ -4,6 +4,9 @@ from src.graph.workflow import build_research_graph
 from src.models.research import ResearchHypothesis, ResearchRunRequest, ResearchRunResponse
 from src.models.strategy import StrategySpec
 from src.models.backtest import BacktestResult
+from src.models.evaluation import EvaluationResult
+from src.models.report import ResearchReport
+from src.models.risk import RiskResult
 
 
 class ResearchGraphService:
@@ -23,11 +26,14 @@ class ResearchGraphService:
             "top_k": request.top_k,
             "slippage_bps": request.slippage_bps,
             "initial_capital": request.initial_capital,
+            "annual_risk_free_rate": request.annual_risk_free_rate,
+            "var_confidence": request.var_confidence,
             "research": None,
             "strategy": None,
             "backtest": None,
             "risk": None,
             "evaluation": None,
+            "report": None,
             "iteration": 0,
             "status": "STARTED",
             "current_agent": None,
@@ -41,6 +47,9 @@ class ResearchGraphService:
         research = result.get("research")
         strategy = result.get("strategy")
         backtest = result.get("backtest")
+        risk = result.get("risk")
+        evaluation = result.get("evaluation")
+        report = result.get("report")
         return ResearchRunResponse(
             research_id=research_id,
             status=result["status"],
@@ -50,5 +59,8 @@ class ResearchGraphService:
             research=ResearchHypothesis.model_validate(research) if research else None,
             strategy=StrategySpec.model_validate(strategy) if strategy else None,
             backtest=BacktestResult.model_validate(backtest) if backtest else None,
+            risk=RiskResult.model_validate(risk) if risk else None,
+            evaluation=EvaluationResult.model_validate(evaluation) if evaluation else None,
+            report=ResearchReport.model_validate(report) if report else None,
             errors=result.get("errors", []),
         )

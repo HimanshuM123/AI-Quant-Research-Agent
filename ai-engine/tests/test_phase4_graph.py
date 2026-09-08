@@ -28,7 +28,7 @@ class FakeProvider:
         )
 
 
-def test_phase_5_graph_runs_through_strategy_generation():
+def test_phase_6_graph_runs_through_strategy_generation():
     store = InMemoryVectorStore(HashEmbeddingProvider(dimensions=128))
     store.add(chunk_document(Document("m", "Momentum", "momentum trend volatility filter"), chunk_size=100, overlap=10))
     research_agent = ResearchAgent(ResearchRetriever(store), DeterministicResearchSynthesizer())
@@ -49,6 +49,6 @@ def test_phase_5_graph_runs_through_strategy_generation():
         "status": "STARTED",
         "errors": [],
     })
-    assert state["status"] == "BACKTEST_READY"
-    assert state["current_agent"] == "backtest"
+    assert state["status"] == "REPORT_READY"
+    assert state["current_agent"] == "report"
     assert state["strategy"]["entry"]["logic"] == "all"

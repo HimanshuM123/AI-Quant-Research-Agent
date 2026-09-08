@@ -8,6 +8,8 @@ class EquityPoint(BaseModel):
     benchmark_equity: float
     strategy_return: float
     benchmark_return: float
+    turnover: float = 0.0
+    gross_exposure: float = 0.0
 
 
 class TradeRecord(BaseModel):

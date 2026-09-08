@@ -5,6 +5,9 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from src.models.strategy import StrategySpec
 from src.models.backtest import BacktestResult
+from src.models.evaluation import EvaluationResult
+from src.models.risk import RiskResult
+from src.models.report import ResearchReport
 
 
 class ResearchRunRequest(BaseModel):
@@ -17,6 +20,8 @@ class ResearchRunRequest(BaseModel):
     top_k: int = Field(default=5, ge=1, le=10)
     slippage_bps: float = Field(default=2.0, ge=0.0, le=100.0)
     initial_capital: float = Field(default=100000.0, gt=0.0, le=1_000_000_000.0)
+    annual_risk_free_rate: float = Field(default=0.0, ge=-0.5, le=1.0)
+    var_confidence: float = Field(default=0.95, gt=0.5, lt=1.0)
 
     @field_validator("symbols")
     @classmethod
@@ -60,4 +65,7 @@ class ResearchRunResponse(BaseModel):
     research: ResearchHypothesis | None = None
     strategy: StrategySpec | None = None
     backtest: BacktestResult | None = None
+    risk: RiskResult | None = None
+    evaluation: EvaluationResult | None = None
+    report: ResearchReport | None = None
     errors: list[str] = Field(default_factory=list)
