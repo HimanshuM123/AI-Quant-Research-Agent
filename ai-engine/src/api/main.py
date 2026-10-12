@@ -92,3 +92,9 @@ def run_research(request: ResearchRunRequest) -> ResearchRunResponse:
     if response.status == "FAILED":
         raise HTTPException(status_code=502, detail=response.errors)
     return response
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="127.0.0.1", port=8000, reload=False)

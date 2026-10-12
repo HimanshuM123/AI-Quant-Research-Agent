@@ -46,3 +46,8 @@ END
 5. LLM providers, embedding providers, vector stores and market-data providers are replaceable behind interfaces.
 6. Graph routing stops immediately on upstream market-data failure.
 7. Test paths are offline and deterministic.
+
+
+
+
+Research a 20-day momentum strategy for the selected stocks. Use a 20-day volatility filter to avoid unusually volatile assets, then evaluate the strategy against buy-and-hold, including transaction costs and risk metrics.

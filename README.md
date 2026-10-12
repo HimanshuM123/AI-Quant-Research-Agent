@@ -155,3 +155,84 @@ The container used to build this phase does not have `langgraph` installed, so t
 ## Next milestone
 
 Phase 6 adds a deterministic Risk Agent: CAGR, annualized volatility, Sharpe, Sortino, maximum drawdown, VaR, Expected Shortfall, turnover, exposure, and additional risk diagnostics.
+
+## Phase 6 — Risk Agent
+
+The workflow now continues from the deterministic backtest into deterministic risk analytics:
+
+`Market Data -> RAG Research -> Strategy DSL -> Backtest -> Risk`
+
+The Risk Agent calculates from realized backtest returns and portfolio state:
+
+- CAGR
+- annualized volatility
+- Sharpe ratio
+- Sortino ratio
+- maximum drawdown
+- historical Value at Risk (VaR)
+- historical Expected Shortfall (ES)
+- total and average daily turnover
+- average and maximum gross exposure
+- percentage of days in market
+- benchmark risk metrics for equal-weight buy-and-hold
+
+The backtest equity curve now carries daily `turnover` and `gross_exposure` so the Risk Agent consumes actual portfolio state rather than inferring exposure from trades.
+
+### Research API Phase 6 parameters
+
+```json
+{
+  "query": "Research a momentum strategy for AAPL and MSFT with a volatility filter",
+  "symbols": ["AAPL", "MSFT"],
+  "start_date": "2020-01-01",
+  "end_date": "2026-01-01",
+  "volatility_window": 20,
+  "momentum_window": 20,
+  "top_k": 5,
+  "slippage_bps": 2,
+  "initial_capital": 100000,
+  "annual_risk_free_rate": 0.04,
+  "var_confidence": 0.95
+}
+```
+
+Successful terminal state: `RISK_READY`.
+
+
+1) From the project root:
+
+cd "D:\Workspace\AI_Quant_Research_Agent_Platform\ai-quant-research-agent"
+
+docker compose up -d --build
+docker compose ps
+
+2) Start the frontend in a separate terminal:
+cd "D:\Workspace\AI_Quant_Research_Agent_Platform\ai-quant-research-agent\frontend"
+
+npm install
+npm run dev -- --host 0.0.0.0
+
+Open:
+
+Frontend: http://localhost:5173
+AI API docs: http://localhost:8000/docs
+Java health: http://localhost:8080/actuator/health
+
+3) Stop the backend:
+cd "D:\Workspace\AI_Quant_Research_Agent_Platform\ai-quant-research-agent"
+docker compose down
+
+
+Intellij IDEA--------------------------------------------------
+A) Env Variables:
+DATABASE_URL=jdbc:postgresql://localhost:5432/quantagent;DATABASE_USERNAME=quantagent;DATABASE_PASSWORD=quantagent;KAFKA_BOOTSTRAP_SERVERS=localhost:9092;REDIS_HOST=localhost;PYTHON_AI_BASE_URL=http://localhost:8000;QUANT_SECURITY_ENABLED=false
+
+com.portfolio.quant.QuantPlatformApplication
+
+Pycharm--------------------------------------------------------
+src.api.main:app --reload --host 0.0.0.0 --port 8000
+
+D:\Workspace\AI_Quant_Research_Agent_Platform\ai-quant-research-agent\ai-engine
+
+Env variables: 
+PYTHONPATH=D:\Workspace\AI_Quant_Research_Agent_Platform\ai-quant-research-agent\ai-engine

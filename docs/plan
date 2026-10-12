@@ -1,0 +1,191 @@
+For this AI Quant Research Agent, I’d use a stack that looks production-grade but is still practical to build as a portfolio project.
+
+Layer	Tech
+Frontend	React + TypeScript
+API Gateway / Backend	FastAPI initially; optional Spring Boot integration later
+Agent Orchestration	LangGraph
+LLM Integration	OpenAI / Anthropic SDK, optionally LangChain
+RAG	LangChain/LlamaIndex-style ingestion + Qdrant or pgvector
+Embeddings	OpenAI embeddings or equivalent
+Market Data	yfinance initially; later Polygon/Alpaca/Nasdaq Data Link
+Data Processing	Pandas, NumPy
+Quant/Statistics	SciPy, statsmodels, arch
+ML	scikit-learn
+Deep Learning	PyTorch
+Backtesting	Custom Python engine first; optionally vectorbt/backtrader later
+Risk Analytics	NumPy/Pandas + custom risk library
+Database	PostgreSQL
+Vector Database	pgvector or Qdrant
+Cache	Redis
+Messaging	Kafka for advanced version
+API Contracts	Pydantic
+Async Processing	Celery/RQ initially; Kafka workers later
+Experiment Tracking	MLflow
+Agent Tracing	LangSmith and/or OpenTelemetry
+Visualization	Plotly
+Containerization	Docker + Docker Compose
+Deployment	AWS
+AWS Services	ECS/EKS, ECR, RDS, S3, CloudWatch
+CI/CD	GitHub Actions
+Testing	pytest
+Code Quality	Ruff + Black + mypy
+Recommended architecture
+React UI
+   │
+   ▼
+FastAPI
+   │
+   ▼
+LangGraph Supervisor
+   │
+   ├── Market Data Agent
+   ├── Research/RAG Agent
+   ├── Strategy Agent
+   ├── Backtest Agent
+   ├── Risk Agent
+   ├── Evaluation Agent
+   └── Report Agent
+          │
+          ▼
+ ┌───────────────────────┐
+ │ Quant Python Services │
+ │ Pandas / NumPy        │
+ │ SciPy / statsmodels   │
+ │ PyTorch / sklearn     │
+ └───────────────────────┘
+          │
+    ┌─────┴─────┐
+    ▼           ▼
+PostgreSQL    Qdrant
+   │
+   ▼
+ Redis
+
+For your portfolio, I would not start with Kafka, Kubernetes, 15 microservices, and several databases. That can make the project look overengineered.
+
+Start with this V1 stack:
+
+Python 3.12
+FastAPI
+LangGraph
+OpenAI / Claude
+Pydantic
+
+Pandas
+NumPy
+SciPy
+statsmodels
+arch
+scikit-learn
+PyTorch
+
+PostgreSQL
+pgvector
+
+Redis
+
+React + TypeScript
+Plotly
+
+Docker
+GitHub Actions
+AWS
+
+This gives you everything needed for Agents + RAG + Quant + ML + API + Cloud.
+
+Then we can build a more impressive V2 FDE architecture around your Java background
+
+
+Yes. I recommend making Java a meaningful part of the project, not adding it just for the sake of the résumé.
+
+A strong split would be: Java/Spring Boot for the enterprise-facing platform layer, and Python for AI/ML/quant computation.
+
+React UI
+   │
+   ▼
+Spring Boot
+   │
+   ├── Authentication / authorization
+   ├── API gateway / orchestration
+   ├── User research requests
+   ├── Job tracking
+   ├── Audit trail
+   ├── Portfolio / strategy metadata
+   └── Kafka integration
+             │
+             ▼
+         Kafka / REST
+             │
+             ▼
+      Python AI Platform
+             │
+        LangGraph
+   ┌─────────┼──────────┐
+   ▼         ▼          ▼
+Research   Strategy   Backtest
+ Agent      Agent       Agent
+   │                    │
+   ▼                    ▼
+ RAG                 Risk Engine
+   │
+pgvector
+
+So the stack becomes Java 21 + Spring Boot 3 + Kafka + PostgreSQL on the enterprise/backend side, with Python + FastAPI + LangGraph + Pandas/NumPy/PyTorch on the AI and quant side.
+
+Java can own APIs such as:
+
+POST /api/research
+GET  /api/research/{id}
+GET  /api/strategies/{id}
+GET  /api/backtests/{id}
+GET  /api/reports/{id}
+
+For example, a user submits:
+
+{
+  "query": "Find a momentum strategy for NVDA",
+  "startDate": "2018-01-01",
+  "endDate": "2026-01-01",
+  "maxDrawdown": 0.20
+}
+
+Spring Boot validates and persists the request, then publishes something like:
+
+quant.research.requested
+
+The Python LangGraph service consumes it and runs:
+
+Market Data
+    ↓
+RAG Research
+    ↓
+Strategy Generation
+    ↓
+Backtest
+    ↓
+Risk
+    ↓
+Evaluation
+    ↓
+Report
+
+Then the result comes back through Kafka:
+
+quant.research.completed
+
+That gives you a much better Forward Deployed Engineer story than a Python-only demo because you can explain enterprise integration, distributed systems, event-driven architecture, AI agents, RAG, tool calling, quantitative computation, observability, and deployment in one project.
+
+
+
+
+I would therefore build it in two layers:
+
+Phase 1: Python/FastAPI/LangGraph first so we get the actual AI Quant Agent working.
+
+Phase 2: Introduce Java Spring Boot + Kafka as the production integration layer.
+
+The final portfolio stack would be:
+
+React + Java 21 + Spring Boot 3 + Kafka + Python + FastAPI + LangGraph + RAG + PostgreSQL/pgvector + Redis + Pandas/NumPy + PyTorch + Docker + AWS.
+
+That is the version I would use for your FDE portfolio.

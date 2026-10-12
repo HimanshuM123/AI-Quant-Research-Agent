@@ -1,8 +1,53 @@
 server:
   port: 8080
 
+python:
+  ai:
+    base-url: http://localhost:8000
+
+spring:
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/quantagent}
+    username: ${DATABASE_USERNAME:quantagent}
+    password: ${DATABASE_PASSWORD:quantagent}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:update}
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+
+quant:
+  security:
+    enabled: ${QUANT_SECURITY_ENABLED:false}
+    username: ${QUANT_SECURITY_USERNAME:quantadmin}
+    password: ${QUANT_SECURITY_PASSWORD:change-me-in-production}
+  jobs:
+    lock-ttl-seconds: ${RESEARCH_JOB_LOCK_TTL_SECONDS:1800}
+  events:
+    requested-topic: ${QUANT_RESEARCH_REQUESTED_TOPIC:quant.research.requested}
+    completed-topic: ${QUANT_RESEARCH_COMPLETED_TOPIC:quant.research.completed}
+    failed-topic: ${QUANT_RESEARCH_FAILED_TOPIC:quant.research.failed}
+
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
+  metrics:
+    tags:
+      application: quant-platform
